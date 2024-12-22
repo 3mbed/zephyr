@@ -822,6 +822,9 @@ int bt_mesh_net_decode(struct net_buf_simple *in, enum bt_mesh_net_if net_if,
 
 	LOG_DBG("%u bytes: %s", in->len, bt_hex(in->data, in->len));
 
+	LOG_INF("%u bytes: %s", in->len, bt_hex(in->data, in->len));
+
+
 	rx->net_if = net_if;
 
 	if (!bt_mesh_net_cred_find(rx, in, out, net_decrypt)) {
@@ -856,6 +859,8 @@ int bt_mesh_net_decode(struct net_buf_simple *in, enum bt_mesh_net_if net_if,
 	LOG_DBG("src 0x%04x dst 0x%04x ttl %u", rx->ctx.addr, rx->ctx.recv_dst, rx->ctx.recv_ttl);
 	LOG_DBG("PDU: %s", bt_hex(out->data, out->len));
 
+	LOG_INF("PDU: %s", bt_hex(out->data, out->len));
+
 	msg_cache_add(rx);
 
 	return 0;
@@ -878,6 +883,13 @@ void bt_mesh_net_recv(struct net_buf_simple *data, int8_t rssi,
 	if (bt_mesh_net_decode(data, net_if, &rx, &buf)) {
 		return;
 	}
+	//----------- custom code -------------
+	// LOG_INF("-----------\n\r");
+	// for (uint16_t i = 0; i < data->len; i++) {
+    //     LOG_INF("%02X ", data->data[i]); // Print each byte as a 2-digit hexadecimal number
+    // }
+    // LOG_INF("-----------\n\r");
+	//-------------------------------------
 
 	if (IS_ENABLED(CONFIG_BT_MESH_STATISTIC)) {
 		bt_mesh_stat_rx(net_if);

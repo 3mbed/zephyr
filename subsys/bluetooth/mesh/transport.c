@@ -1633,6 +1633,7 @@ int bt_mesh_trans_recv(struct net_buf_simple *buf, struct bt_mesh_net_rx *rx)
 	net_buf_simple_pull(buf, BT_MESH_NET_HDR_LEN);
 
 	LOG_DBG("Payload %s", bt_hex(buf->data, buf->len));
+	LOG_INF("Payload %s", bt_hex(buf->data, buf->len));
 
 	if (IS_ENABLED(CONFIG_BT_TESTING)) {
 		bt_mesh_test_net_recv(rx->ctx.recv_ttl, rx->ctl, rx->ctx.addr, rx->ctx.recv_dst,

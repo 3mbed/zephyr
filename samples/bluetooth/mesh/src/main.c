@@ -18,7 +18,11 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/mesh.h>
 
+#include <zephyr/console/console.h>
+
 #include "board.h"
+
+#define FAIL_MSG "fail (err %d)\n"
 
 #define OP_ONOFF_GET       BT_MESH_MODEL_OP_2(0x82, 0x01)
 #define OP_ONOFF_SET       BT_MESH_MODEL_OP_2(0x82, 0x02)
@@ -27,11 +31,13 @@
 
 static void attention_on(const struct bt_mesh_model *mod)
 {
+	printk("%s\n", __func__);
 	board_led_set(true);
 }
 
 static void attention_off(const struct bt_mesh_model *mod)
 {
+	printk("%s\n", __func__);
 	board_led_set(false);
 }
 
@@ -105,6 +111,7 @@ static inline uint8_t model_time_encode(int32_t ms)
 static int onoff_status_send(const struct bt_mesh_model *model,
 			     struct bt_mesh_msg_ctx *ctx)
 {
+	printk("%s\n", __func__);
 	uint32_t remaining;
 
 	BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_STATUS, 3);
@@ -132,6 +139,7 @@ static int onoff_status_send(const struct bt_mesh_model *model,
 
 static void onoff_timeout(struct k_work *work)
 {
+	printk("%s\n", __func__);
 	if (onoff.transition_time) {
 		/* Start transition.
 		 *
@@ -155,6 +163,7 @@ static int gen_onoff_get(const struct bt_mesh_model *model,
 			 struct bt_mesh_msg_ctx *ctx,
 			 struct net_buf_simple *buf)
 {
+	printk("%s\n", __func__);
 	onoff_status_send(model, ctx);
 	return 0;
 }
@@ -163,6 +172,7 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,
 			       struct bt_mesh_msg_ctx *ctx,
 			       struct net_buf_simple *buf)
 {
+	printk("%s\n", __func__);
 	uint8_t val = net_buf_simple_pull_u8(buf);
 	uint8_t tid = net_buf_simple_pull_u8(buf);
 	int32_t trans = 0;
@@ -206,6 +216,7 @@ static int gen_onoff_set(const struct bt_mesh_model *model,
 			 struct bt_mesh_msg_ctx *ctx,
 			 struct net_buf_simple *buf)
 {
+	printk("%s\n", __func__);
 	(void)gen_onoff_set_unack(model, ctx, buf);
 	onoff_status_send(model, ctx);
 
@@ -280,11 +291,13 @@ static int output_number(bt_mesh_output_action_t action, uint32_t number)
 
 static void prov_complete(uint16_t net_idx, uint16_t addr)
 {
+	printk("%s\n", __func__);
 	board_prov_complete();
 }
 
 static void prov_reset(void)
 {
+	printk("%s\n", __func__);
 	bt_mesh_prov_enable(BT_MESH_PROV_ADV | BT_MESH_PROV_GATT);
 }
 
@@ -302,6 +315,7 @@ static const struct bt_mesh_prov prov = {
 /** Send an OnOff Set message from the Generic OnOff Client to all nodes. */
 static int gen_onoff_send(bool val)
 {
+	printk("%s\n", __func__);
 	struct bt_mesh_msg_ctx ctx = {
 		.app_idx = models[3].keys[0], /* Use the bound key */
 		.addr = BT_MESH_ADDR_ALL_NODES,
@@ -327,11 +341,14 @@ static int gen_onoff_send(bool val)
 
 static void button_pressed(struct k_work *work)
 {
+	printk("button pressed \n");
 	if (bt_mesh_is_provisioned()) {
 		(void)gen_onoff_send(!onoff.val);
 		return;
 	}
 
+	printk("Self-provision with an arbitrary address\n");
+	printk("This should never be done in a production environment. \n");
 	/* Self-provision with an arbitrary address.
 	 *
 	 * NOTE: This should never be done in a production environment.
@@ -401,10 +418,35 @@ static void bt_ready(int err)
 
 int main(void)
 {
+	printk("%s\n", __func__);
 	static struct k_work button_work;
 	int err = -1;
 
+	K_SECONDS(5);
+
+	int rc;
+
+settings_delete("bt/hash");				if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+settings_delete("bt/mesh/Seq");			if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+settings_delete("bt/mesh/IV");			if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+settings_delete("bt/mesh/Net");			if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+settings_delete("bt/mesh/NetKey/0");	if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+settings_delete("bt/mesh/Net");			if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+settings_delete("bt/mesh/NetKey/0");	if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+settings_delete("bt/mesh/AppKey/0");	if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+settings_delete("bt/mesh/s/2/bind");	if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+settings_delete("bt/mesh/s/3/bind");	if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+settings_delete("bt/mesh/RPL/1");  		if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+settings_delete("bt/mesh/RPL/20");		if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+settings_delete("bt/mesh/RPL/21");		if (rc) {printk(FAIL_MSG, rc);} else {printk("OK.\n");}
+	
+	printk("Waiting for a key input to mesh init...\n");
+
+	console_init();
+	char inCh = console_getchar();
+
 	printk("Initializing...\n");
+
 
 	if (IS_ENABLED(CONFIG_HWINFO)) {
 		err = hwinfo_get_device_id(dev_uuid, sizeof(dev_uuid));

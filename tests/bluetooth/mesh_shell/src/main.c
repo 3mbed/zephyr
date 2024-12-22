@@ -160,7 +160,7 @@ int main(void)
 {
 	int err;
 
-	printk("Initializing...\n");
+	printk("Hi.. Initializing...\n");
 
 	/* Initialize the Bluetooth Subsystem */
 	err = bt_enable(bt_ready);
