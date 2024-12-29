@@ -821,6 +821,7 @@ int bt_mesh_net_decode(struct net_buf_simple *in, enum bt_mesh_net_if net_if,
 	}
 
 	LOG_DBG("%u bytes: %s", in->len, bt_hex(in->data, in->len));
+	LOG_INF("%u bytes: %s", in->len, bt_hex(in->data, in->len));
 
 	rx->net_if = net_if;
 
@@ -855,6 +856,7 @@ int bt_mesh_net_decode(struct net_buf_simple *in, enum bt_mesh_net_if net_if,
 
 	LOG_DBG("src 0x%04x dst 0x%04x ttl %u", rx->ctx.addr, rx->ctx.recv_dst, rx->ctx.recv_ttl);
 	LOG_DBG("PDU: %s", bt_hex(out->data, out->len));
+	LOG_INF("PDU: %s", bt_hex(out->data, out->len));
 
 	msg_cache_add(rx);
 
