@@ -27,11 +27,13 @@
 
 static void attention_on(const struct bt_mesh_model *mod)
 {
+	printk("DBG: model=> Health : %s \n", __func__);
 	board_led_set(true);
 }
 
 static void attention_off(const struct bt_mesh_model *mod)
 {
+	printk("DBG: model=> Health : %s \n", __func__);
 	board_led_set(false);
 }
 
@@ -105,6 +107,7 @@ static inline uint8_t model_time_encode(int32_t ms)
 static int onoff_status_send(const struct bt_mesh_model *model,
 			     struct bt_mesh_msg_ctx *ctx)
 {
+	printk("DBG: model=> OnOff Server : %s \n", __func__);
 	uint32_t remaining;
 
 	BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_STATUS, 3);
@@ -155,6 +158,7 @@ static int gen_onoff_get(const struct bt_mesh_model *model,
 			 struct bt_mesh_msg_ctx *ctx,
 			 struct net_buf_simple *buf)
 {
+	printk("DBG: model=> OnOff Server : %s \n", __func__);
 	onoff_status_send(model, ctx);
 	return 0;
 }
@@ -163,6 +167,7 @@ static int gen_onoff_set_unack(const struct bt_mesh_model *model,
 			       struct bt_mesh_msg_ctx *ctx,
 			       struct net_buf_simple *buf)
 {
+	printk("DBG: model=> OnOff Server : %s \n", __func__);
 	uint8_t val = net_buf_simple_pull_u8(buf);
 	uint8_t tid = net_buf_simple_pull_u8(buf);
 	int32_t trans = 0;
@@ -206,6 +211,7 @@ static int gen_onoff_set(const struct bt_mesh_model *model,
 			 struct bt_mesh_msg_ctx *ctx,
 			 struct net_buf_simple *buf)
 {
+	printk("DBG: model=> OnOff Server : %s \n", __func__);
 	(void)gen_onoff_set_unack(model, ctx, buf);
 	onoff_status_send(model, ctx);
 
@@ -225,6 +231,7 @@ static int gen_onoff_status(const struct bt_mesh_model *model,
 			    struct bt_mesh_msg_ctx *ctx,
 			    struct net_buf_simple *buf)
 {
+	printk("DBG: model=> OnOff client : %s \n", __func__);
 	uint8_t present = net_buf_simple_pull_u8(buf);
 
 	if (buf->len) {
@@ -302,6 +309,7 @@ static const struct bt_mesh_prov prov = {
 /** Send an OnOff Set message from the Generic OnOff Client to all nodes. */
 static int gen_onoff_send(bool val)
 {
+	printk("DBG: model=> OnOff client : %s \n", __func__);
 	struct bt_mesh_msg_ctx ctx = {
 		.app_idx = models[3].keys[0], /* Use the bound key */
 		.addr = BT_MESH_ADDR_ALL_NODES,
