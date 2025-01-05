@@ -337,7 +337,7 @@ static int gen_onoff_send(bool val)
 static void button_pressed(struct k_work *work)
 {
 	if (bt_mesh_is_provisioned()) {
-		(void)gen_onoff_send(!onoff.val);
+		(void)gen_onoff_send(!onoff.val); //toggle on to off to on , the client tells others to on and off 
 		return;
 	}
 
@@ -413,7 +413,13 @@ void my_task(uint32_t sleep_ms)
 	int runCnt = 0;
 	printk("DBG: Task=> : %s \n", __func__);
 	while(1){
-		printk("DBG: Task=> : runs %d times \n", runCnt);	
+		// printk("DBG: Task=> : runs %d times \n", runCnt);
+
+		// like button pressed send message to all the nodes
+		// if (bt_mesh_is_provisioned()) {
+		// 	(void)gen_onoff_send(!onoff.val);
+		// }
+
 		k_msleep(sleep_ms);
 		runCnt++;
 	}
@@ -422,7 +428,7 @@ void my_task(uint32_t sleep_ms)
 void my_task_entry(void)
 {
 	printk("DBG: Task=> : %s \n", __func__);
-	my_task(2000);
+	my_task(5000);
 }
 
 int main(void)
