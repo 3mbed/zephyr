@@ -17,6 +17,7 @@
 
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/mesh.h>
+#include <zephyr/kernel.h>
 
 #include "board.h"
 
@@ -407,6 +408,23 @@ static void bt_ready(int err)
 	printk("Mesh initialized\n");
 }
 
+void my_task(uint32_t sleep_ms)
+{
+	int runCnt = 0;
+	printk("DBG: Task=> : %s \n", __func__);
+	while(1){
+		printk("DBG: Task=> : runs %d times \n", runCnt);	
+		k_msleep(sleep_ms);
+		runCnt++;
+	}
+}
+
+void my_task_entry(void)
+{
+	printk("DBG: Task=> : %s \n", __func__);
+	my_task(2000);
+}
+
 int main(void)
 {
 	static struct k_work button_work;
@@ -440,3 +458,7 @@ int main(void)
 	}
 	return 0;
 }
+
+K_THREAD_DEFINE(my_task_id, 1024, my_task_entry, 
+		NULL, NULL, NULL,
+		7, 0, 0);
