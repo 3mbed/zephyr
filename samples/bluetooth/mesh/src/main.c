@@ -21,10 +21,12 @@
 
 #include "board.h"
 
-#define OP_LVL_GET       BT_MESH_MODEL_OP_2(0x82, 0x01)
-#define OP_LVL_SET       BT_MESH_MODEL_OP_2(0x82, 0x02)
-#define OP_LVL_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
-#define OP_LVL_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
+#define OP_ONOFF_GET       BT_MESH_MODEL_OP_2(0x82, 0x01)
+#define OP_ONOFF_SET       BT_MESH_MODEL_OP_2(0x82, 0x02)
+#define OP_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
+#define OP_ONOFF_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
+
+// #define CLIENT_TASK_SEND 1
 
 static void attention_on(const struct bt_mesh_model *mod)
 {
@@ -57,7 +59,7 @@ static struct {
 	uint16_t src;
 	uint32_t transition_time;
 	struct k_work_delayable work;
-} mlevel;
+} onoff;
 
 /* OnOff messages' transition time and remaining time fields are encoded as an
  * 8 bit value with a 6 bit step field and a 2 bit resolution field.
@@ -105,18 +107,18 @@ static inline uint8_t model_time_encode(int32_t ms)
 	return 0x3f;
 }
 
-static int mlevel_status_send(const struct bt_mesh_model *model,
+static int onoff_status_send(const struct bt_mesh_model *model,
 			     struct bt_mesh_msg_ctx *ctx)
 {
-	printk("DBG: model=> mlevel Server : %s \n", __func__);
+	printk("DBG: model=> OnOff Server : %s \n", __func__);
 	uint32_t remaining;
 
-	BT_MESH_MODEL_BUF_DEFINE(buf, OP_LVL_STATUS, 3);
-	bt_mesh_model_msg_init(&buf, OP_LVL_STATUS);
+	BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_STATUS, 3);
+	bt_mesh_model_msg_init(&buf, OP_ONOFF_STATUS);
 
 	remaining = k_ticks_to_ms_floor32(
-			    k_work_delayable_remaining_get(&mlevel.work)) +
-		    mlevel.transition_time;
+			    k_work_delayable_remaining_get(&onoff.work)) +
+		    onoff.transition_time;
 
 	/* Check using remaining time instead of "work pending" to make the
 	 * onoff status send the right value on instant transitions. As the
@@ -124,11 +126,11 @@ static int mlevel_status_send(const struct bt_mesh_model *model,
 	 * handler, the work will be pending even on instant transitions.
 	 */
 	if (remaining) {
-		// net_buf_simple_add_u8(&buf, !mlevel.val);
-		net_buf_simple_add_u8(&buf, mlevel.val);
+		//net_buf_simple_add_u8(&buf, !onoff.val);
+		net_buf_simple_add_u8(&buf, onoff.val);
 		net_buf_simple_add_u8(&buf, model_time_encode(remaining));
 	} else {
-		net_buf_simple_add_u8(&buf, mlevel.val);
+		net_buf_simple_add_u8(&buf, onoff.val);
 	}
 
 	return bt_mesh_model_send(model, ctx, &buf, NULL, NULL);
@@ -136,7 +138,7 @@ static int mlevel_status_send(const struct bt_mesh_model *model,
 
 static void onoff_timeout(struct k_work *work)
 {
-	if (mlevel.transition_time) {
+	if (onoff.transition_time) {
 		/* Start transition.
 		 *
 		 * The LED should be on as long as the transition is in
@@ -145,30 +147,30 @@ static void onoff_timeout(struct k_work *work)
 		 */
 		board_led_set(true);
 
-		k_work_reschedule(&mlevel.work, K_MSEC(mlevel.transition_time));
-		mlevel.transition_time = 0;
+		k_work_reschedule(&onoff.work, K_MSEC(onoff.transition_time));
+		onoff.transition_time = 0;
 		return;
 	}
 
-	//board_led_set(mlevel.val);
+	//board_led_set(onoff.val);
 }
 
 /* Generic OnOff Server message handlers */
 
-static int gen_mlevel_get(const struct bt_mesh_model *model,
+static int gen_onoff_get(const struct bt_mesh_model *model,
 			 struct bt_mesh_msg_ctx *ctx,
 			 struct net_buf_simple *buf)
 {
-	printk("DBG: model=> mlevel Server : %s \n", __func__);
-	mlevel_status_send(model, ctx);
+	printk("DBG: model=> OnOff Server : %s \n", __func__);
+	onoff_status_send(model, ctx);
 	return 0;
 }
 
-static int gen_mlevel_set_unack(const struct bt_mesh_model *model,
+static int gen_onoff_set_unack(const struct bt_mesh_model *model,
 			       struct bt_mesh_msg_ctx *ctx,
 			       struct net_buf_simple *buf)
 {
-	printk("DBG: model=> mlevel Server : %s \n", __func__);
+	printk("DBG: model=> OnOff Server : %s \n", __func__);
 	uint8_t val = net_buf_simple_pull_u8(buf);
 	uint8_t tid = net_buf_simple_pull_u8(buf);
 	int32_t trans = 0;
@@ -182,57 +184,59 @@ static int gen_mlevel_set_unack(const struct bt_mesh_model *model,
 	/* Only perform change if the message wasn't a duplicate and the
 	 * value is different.
 	 */
-	if (tid == mlevel.tid && ctx->addr == mlevel.src) {
+	if (tid == onoff.tid && ctx->addr == onoff.src) {
 		/* Duplicate */
+		printk("duplicate data");
 		return 0;
 	}
 
-	if (val == mlevel.val) {
+	if (val == onoff.val) {
 		/* No change */
+		printk("no change %d", onoff.val);
 		return 0;
 	}
 
 	// printk("set: %s delay: %d ms time: %d ms\n", onoff_str[val], delay,trans);
-	printk("set: %d \n", val);
+	printk("new data %d", onoff.val);
 
-	mlevel.tid = tid;
-	mlevel.src = ctx->addr;
-	mlevel.val = val;
-	mlevel.transition_time = trans;
+	onoff.tid = tid;
+	onoff.src = ctx->addr;
+	onoff.val = val;
+	onoff.transition_time = trans;
 
 	/* Schedule the next action to happen on the delay, and keep
 	 * transition time stored, so it can be applied in the timeout.
 	 */
-	k_work_reschedule(&mlevel.work, K_MSEC(delay));
+	k_work_reschedule(&onoff.work, K_MSEC(delay));
 
 	return 0;
 }
 
-static int gen_mlevel_set(const struct bt_mesh_model *model,
+static int gen_onoff_set(const struct bt_mesh_model *model,
 			 struct bt_mesh_msg_ctx *ctx,
 			 struct net_buf_simple *buf)
 {
-	printk("DBG: model=> mlevel Server : %s \n", __func__);
-	(void)gen_mlevel_set_unack(model, ctx, buf);
-	mlevel_status_send(model, ctx);
+	printk("DBG: model=> OnOff Server : %s \n", __func__);
+	(void)gen_onoff_set_unack(model, ctx, buf);
+	onoff_status_send(model, ctx);
 
 	return 0;
 }
 
 static const struct bt_mesh_model_op gen_onoff_srv_op[] = {
-	{ OP_LVL_GET,       BT_MESH_LEN_EXACT(0), gen_mlevel_get },
-	{ OP_LVL_SET,       BT_MESH_LEN_MIN(2),   gen_mlevel_set },
-	{ OP_LVL_SET_UNACK, BT_MESH_LEN_MIN(2),   gen_mlevel_set_unack },
+	{ OP_ONOFF_GET,       BT_MESH_LEN_EXACT(0), gen_onoff_get },
+	{ OP_ONOFF_SET,       BT_MESH_LEN_MIN(2),   gen_onoff_set },
+	{ OP_ONOFF_SET_UNACK, BT_MESH_LEN_MIN(2),   gen_onoff_set_unack },
 	BT_MESH_MODEL_OP_END,
 };
 
-/* Generic mlevel Client */
+/* Generic OnOff Client */
 
-static int gen_mlevel_status(const struct bt_mesh_model *model,
+static int gen_onoff_status(const struct bt_mesh_model *model,
 			    struct bt_mesh_msg_ctx *ctx,
 			    struct net_buf_simple *buf)
 {
-	printk("DBG: model=> mlevel client : %s \n", __func__);
+	printk("DBG: model=> OnOff client : %s \n", __func__);
 	uint8_t present = net_buf_simple_pull_u8(buf);
 
 	if (buf->len) {
@@ -240,17 +244,17 @@ static int gen_mlevel_status(const struct bt_mesh_model *model,
 		int32_t remaining_time =
 			model_time_decode(net_buf_simple_pull_u8(buf));
 
-                printk("Level status = %d\n", mlevel.val);
+                printk("Level status = %d\n", onoff.val);
 		return 0;
 	}
 
-        printk("Level status = %d\n", mlevel.val);
+        printk("Level status = %d\n", onoff.val);
 
 	return 0;
 }
 
 static const struct bt_mesh_model_op gen_onoff_cli_op[] = {
-	{OP_LVL_STATUS, BT_MESH_LEN_MIN(1), gen_mlevel_status},
+	{OP_ONOFF_STATUS, BT_MESH_LEN_MIN(1), gen_onoff_status},
 	BT_MESH_MODEL_OP_END,
 };
 
@@ -306,10 +310,10 @@ static const struct bt_mesh_prov prov = {
 	.reset = prov_reset,
 };
 
-/** Send an mlevel Set message from the Generic mlevel Client to all nodes. */
-static int gen_mlevel_send(bool val)
+/** Send an OnOff Set message from the Generic OnOff Client to all nodes. */
+static int gen_onoff_send(uint8_t val)
 {
-	printk("DBG: model=> mlevel client : %s \n", __func__);
+	printk("DBG: model=> OnOff client : %s \n", __func__);
 	struct bt_mesh_msg_ctx ctx = {
 		.app_idx = models[3].keys[0], /* Use the bound key */
 		.addr = BT_MESH_ADDR_ALL_NODES,
@@ -318,17 +322,17 @@ static int gen_mlevel_send(bool val)
 	static uint8_t tid;
 
 	if (ctx.app_idx == BT_MESH_KEY_UNUSED) {
-		printk("The Generic mlevel Client must be bound to a key before "
+		printk("The Generic OnOff Client must be bound to a key before "
 		       "sending.\n");
 		return -ENOENT;
 	}
 
-	BT_MESH_MODEL_BUF_DEFINE(buf, OP_LVL_SET_UNACK, 2);
-	bt_mesh_model_msg_init(&buf, OP_LVL_SET_UNACK);
+	BT_MESH_MODEL_BUF_DEFINE(buf, OP_ONOFF_SET_UNACK, 2);
+	bt_mesh_model_msg_init(&buf, OP_ONOFF_SET_UNACK);
 	net_buf_simple_add_u8(&buf, val);
 	net_buf_simple_add_u8(&buf, tid++);
 
-    printk("Sending mlevel Set: %d\n", mlevel.val);
+    printk("Sending level Set: %d\n", onoff.val);
 
 	return bt_mesh_model_send(&models[3], &ctx, &buf, NULL, NULL);
 }
@@ -336,7 +340,7 @@ static int gen_mlevel_send(bool val)
 static void button_pressed(struct k_work *work)
 {
 	if (bt_mesh_is_provisioned()) {
-		(void)gen_mlevel_send(mlevel.val);
+		(void)gen_onoff_send(onoff.val);
 		return;
 	}
 
@@ -366,7 +370,7 @@ static void button_pressed(struct k_work *work)
 		return;
 	}
 
-	/* Add an application key to both Generic mlevel models: */
+	/* Add an application key to both Generic OnOff models: */
 	err = bt_mesh_app_key_add(0, 0, app_key);
 	if (err) {
 		printk("App key add failed (err: %d)\n", err);
@@ -415,13 +419,18 @@ void my_task(uint32_t sleep_ms)
 		// printk("DBG: Task=> : runs %d times \n", runCnt);
 
 		// like button pressed send message to all the nodes
-		// if (bt_mesh_is_provisioned()) {
-		// 	(void)gen_mlevel_send(mlevel.val);
-		// 	mlevel.val++;
-		// 	if(mlevel.val == 255){
-		// 		mlevel.val = 0;
-		// 	} 
-		// }
+
+		#ifdef CLIENT_TASK_SEND
+
+		if (bt_mesh_is_provisioned()) {
+			(void)gen_onoff_send(onoff.val);
+			onoff.val++;
+			if(onoff.val == 255){
+				onoff.val = 0;
+			} 
+		}
+
+		#endif
 
 		k_msleep(sleep_ms);
 		runCnt++;
@@ -441,6 +450,11 @@ int main(void)
 
 	printk("Initializing...\n");
 
+	#ifdef CLIENT_TASK_SEND
+	printk("Client TASK send Active in this node ..");
+	#endif
+
+
 	if (IS_ENABLED(CONFIG_HWINFO)) {
 		err = hwinfo_get_device_id(dev_uuid, sizeof(dev_uuid));
 	}
@@ -458,7 +472,7 @@ int main(void)
 		return 0;
 	}
 
-	k_work_init_delayable(&mlevel.work, onoff_timeout);
+	k_work_init_delayable(&onoff.work, onoff_timeout);
 
 	/* Initialize the Bluetooth Subsystem */
 	err = bt_enable(bt_ready);
