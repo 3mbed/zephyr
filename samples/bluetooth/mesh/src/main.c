@@ -26,7 +26,7 @@
 #define OP_ONOFF_SET_UNACK BT_MESH_MODEL_OP_2(0x82, 0x03)
 #define OP_ONOFF_STATUS    BT_MESH_MODEL_OP_2(0x82, 0x04)
 
-// #define CLIENT_TASK_SEND 1
+#define CLIENT_TASK_SEND 1
 
 static void attention_on(const struct bt_mesh_model *mod)
 {
